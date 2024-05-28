@@ -32,8 +32,7 @@
 
 enum editorKey {
 	BACKSPACE = 127,
-	// 1000, 1001, 1002, ...
-	ARROW_LEFT = 1000,
+	ARROW_LEFT = 1000, // 1000, 1001, 1002, ...
 	ARROW_RIGHT,
 	ARROW_UP,
 	ARROW_DOWN,
@@ -55,15 +54,15 @@ typedef struct erow { // editor row
 
 // global editor state
 struct editorConfig {
-	int cx, cy;
+	int cx, cy; // cursor location
 	int rx; // index into the render field
 	int rowoff; // row offset, keeps track of what row of a file the user currently is scrolled to
 	int coloff; // same as rowoff, but for columns
 	int screenrows; // max number of rows that can be displayed
 	int screencols; // max cols displayed
 	int numrows; // number of rows
-	erow *row; // a pointer to rows? why can we index this?
-	// row represents a pointer to an array of rows, whenever we want to
+	erow *row; // an array of pointers to each row
+	// row represents an array of pointers to rows, whenever we want to
 	// add a new row, we realloc the ptr to E.row and give it a new size
 	int dirty; // flag that tells us if a file has been edited after loading it in
 	char *filename;
@@ -134,16 +133,16 @@ int editorReadKey(void) {
 	int nread;
 	char c;
 	while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
-		if (nread == -1 && errno != EAGAIN) die("read");
+		if (nread == -1 && errno != EAGAIN) die("read"); // if fail on read
 	}
 
-	if (c == '\x1b') {
-		char seq[3];
+	if (c == '\x1b') { // if theres an escape sequence...
+		char seq[3]; // capture the next 3 characters in the sequence
 
-		if (read(STDIN_FILENO, &seq[0], 1) != 1) return '\x1b';
-		if (read(STDIN_FILENO, &seq[1], 1) != 1) return '\x1b';
+		if (read(STDIN_FILENO, &seq[0], 1) != 1) return '\x1b'; // if fail on read
+		if (read(STDIN_FILENO, &seq[1], 1) != 1) return '\x1b'; // if fail on read
 
-		if (seq[0] == '[') {
+		if (seq[0] == '[') { // validate the sequence
 			if (seq[1] >= '0' && seq[1] <= '9') {
 				if (read(STDIN_FILENO, &seq[2], 1) != 1) return '\x1b';
 				if (seq[2] == '~') {
@@ -174,7 +173,7 @@ int editorReadKey(void) {
 			}
 		}
 		return '\x1b';
-	} else {
+	} else { // if not an escape seq, return the character
 		return c;
 	}
 }
@@ -215,6 +214,7 @@ int getWindowSize(int *rows, int *cols) {
 /*** row operations ***/
 
 int editorRowCxToRx(erow *row, int cx) {
+	// compute render position?
 	int rx = 0;
 	int j;
 	for (j = 0; j < cx; j++) {
@@ -252,13 +252,21 @@ void editorUpdateRow(erow *row) {
 }
 
 void editorInsertRow(int at, char *s, size_t len) {
+	// create and insert a new row
+
 	if (at < 0 || at > E.numrows) return;
 
-	
+	// allocate space for new row
 	E.row = realloc(E.row, sizeof(erow) * (E.numrows + 1));
+
+	// move everything from [at] to [numrows], over 1
 	memmove(&E.row[at + 1], &E.row[at], sizeof(erow) * (E.numrows - at));
-	// E.row represents a pointer to an array of rows, whenever we want to
-	// add a new row, we realloc the ptr to E.row and give it a new size
+	// E.row represents an array of pointers to rows, whenever we want to
+	// we realloc space for it, and move things over to insert it
+
+	// memmove will allocate and handle the move of everything from &E.row[at] to
+	// sizeof(erow) * (E.numrows - at)
+	// so it can fit the new row in
 
 	E.row[at].size = len;
 	E.row[at].chars = malloc(len + 1);
@@ -341,7 +349,7 @@ void editorInsertNewline(void) {
 void editorDelChar(void) {
 	if (E.cy == E.numrows) return;
 	if (E.cx == 0 && E.cy == 0) return;
-	
+
 
 	erow *row = &E.row[E.cy];
 	if (E.cx > 0) {
